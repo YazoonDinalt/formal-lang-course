@@ -7,7 +7,7 @@ import os
 
 
 def test_create_and_save_two_cycles_graphs():
-    # Test of the build_cycles_graph()
+    # Test of the build_cycles_graph(num_vertices1, num_vertices2, labels, filename)
     labels = ("first", "second")
     filename = "testGraph.dot"
 
@@ -24,8 +24,8 @@ def test_create_and_save_two_cycles_graphs():
 
 
 def test_get_graph_data():
-    # Test of the get_graph_info()
-    # Example taken from https://formallanguageconstrainedpathquerying.github.io/CFPQ_Data/graphs/index.html
+    # Test of the get_graph_info(name)
+    # Examples taken from https://formallanguageconstrainedpathquerying.github.io/CFPQ_Data/graphs/index.html
     (vertices, num, labels) = get_graph_info("atom")
     expected_labels = {
         "type",
