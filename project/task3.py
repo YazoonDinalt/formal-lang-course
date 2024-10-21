@@ -3,6 +3,9 @@ import scipy.sparse as sp
 from collections.abc import Iterable
 from pyformlang.finite_automaton import Symbol
 from networkx import MultiDiGraph
+from scipy.sparse import csr_array
+import numpy as np
+from collections import defaultdict
 
 
 class AdjacencyMatrixFA:
@@ -14,12 +17,14 @@ class AdjacencyMatrixFA:
             self.alphabet = set()
             self.start_states = set()
             self.final_states = set()
+            self.boolean_decomposition: dict[Symbol, csr_array] = {}
             return
 
         self.states = {st: i for i, st in enumerate(automation.states)}
         self.states_count = len(self.states)
         self.alphabet = automation.symbols
-
+        self.start_states = {self.states[key] for key in automation.start_states}
+        self.final_states = {self.states[key] for key in automation.final_states}
         graph = automation.to_networkx()
 
         self.matrix = {
@@ -27,12 +32,26 @@ class AdjacencyMatrixFA:
             for s in self.alphabet
         }
 
+        transitions = defaultdict(
+            lambda: np.zeros(
+                (self.states_count, self.states_count),
+                dtype=np.bool_,
+            )
+        )
+
+        for st1, st2, label in graph.edges(data="label"):
+            if not label:
+                continue
+            sym = Symbol(label)
+            transitions[sym][self.states[st1], self.states[st2]] = True
+
+        self.boolean_decomposition = {
+            sym: csr_array(matrix) for (sym, matrix) in transitions.items()
+        }
+
         for u, v, label in graph.edges(data="label"):
             if all(not s.startswith("starting_") for s in (str(u), str(v))):
                 self.matrix[label][self.states[u], self.states[v]] = True
-
-        self.start_states = {self.states[key] for key in automation.start_states}
-        self.final_states = {self.states[key] for key in automation.final_states}
 
     def accepts(self, word: Iterable[Symbol]) -> bool:
         cf = [(list(word), st) for st in self.start_states]
