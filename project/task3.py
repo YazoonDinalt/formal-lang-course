@@ -5,6 +5,7 @@ from pyformlang.finite_automaton import Symbol
 from networkx import MultiDiGraph
 from scipy.sparse import csr_array
 import numpy as np
+from numpy import bool_
 from collections import defaultdict
 
 
@@ -20,22 +21,17 @@ class AdjacencyMatrixFA:
             self.boolean_decomposition: dict[Symbol, csr_array] = {}
             return
 
+        graph = automation.to_networkx()
         self.states = {st: i for i, st in enumerate(automation.states)}
         self.states_count = len(self.states)
+        number_of_states = self.states_count
         self.alphabet = automation.symbols
         self.start_states = {self.states[key] for key in automation.start_states}
         self.final_states = {self.states[key] for key in automation.final_states}
-        graph = automation.to_networkx()
-
-        self.matrix = {
-            s: sp.csr_matrix((self.states_count, self.states_count), dtype=bool)
-            for s in self.alphabet
-        }
-
         transitions = defaultdict(
             lambda: np.zeros(
-                (self.states_count, self.states_count),
-                dtype=np.bool_,
+                (number_of_states, number_of_states),
+                dtype=bool_,
             )
         )
 
@@ -47,6 +43,11 @@ class AdjacencyMatrixFA:
 
         self.boolean_decomposition = {
             sym: csr_array(matrix) for (sym, matrix) in transitions.items()
+        }
+
+        self.matrix = {
+            s: sp.csr_matrix((self.states_count, self.states_count), dtype=bool)
+            for s in self.alphabet
         }
 
         for u, v, label in graph.edges(data="label"):

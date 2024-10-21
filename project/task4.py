@@ -34,23 +34,18 @@ def update_front(
     n: int,
     symbols: set[Symbol],
 ) -> csr_matrix:
-    decomposed_fronts = {
-        symbol: front @ nfa_boolean_decomposition[symbol] for symbol in symbols
-    }
+    decomposed_fronts = {}
+    for sym in symbols:
+        decomposed_fronts[sym] = front @ nfa_boolean_decomposition[sym]
 
-    for symbol, decomposed_front in decomposed_fronts.items():
         for i in range(k):
-            start_idx, end_idx = n * i, n * (i + 1)
-            decomposed_front[start_idx:end_idx] = (
-                dfa_boolean_decomposition[symbol].T
-                @ decomposed_front[start_idx:end_idx]
+            decomposed_fronts[sym][n * i : n * (i + 1)] = (
+                dfa_boolean_decomposition[sym].T
+                @ decomposed_fronts[sym][n * i : n * (i + 1)]
             )
-
-    result = reduce(
-        lambda acc, val: acc + val, decomposed_fronts.values(), csr_matrix(front.shape)
+    return reduce(
+        lambda x, y: x + y, decomposed_fronts.values(), csr_matrix(front.shape)
     )
-
-    return result
 
 
 def ms_bfs_based_rpq(
