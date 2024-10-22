@@ -36,10 +36,10 @@ def hellings_based_cfpq(
             continue
         for production in weak_normal_form.productions:
             if (
-            isinstance(production.body, list)
-            and len(production.body) == 1
-            and isinstance(production.body[0], Terminal)
-            and getattr(production.body[0], "value") == label
+                isinstance(production.body, list)
+                and len(production.body) == 1
+                and isinstance(production.body[0], Terminal)
+                and getattr(production.body[0], "value") == label
             ):
                 cfpq_results.add((u, production.head, v))
 
@@ -53,7 +53,9 @@ def hellings_based_cfpq(
         new_results_found = False
         new_results = set()
 
-        for (n11, headvar1, n12), (n21, headvar2, n22) in itertools.product(cfpq_results, repeat=2):
+        for (n11, headvar1, n12), (n21, headvar2, n22) in itertools.product(
+            cfpq_results, repeat=2
+        ):
             if n12 != n21:
                 continue
             for production in weak_normal_form.productions:
@@ -68,10 +70,12 @@ def hellings_based_cfpq(
 
         cfpq_results.update(new_results)
 
-
-    result_pairs = {(u, v) for u, var, v in cfpq_results
-            if var == weak_normal_form.start_symbol
-            and (not start_nodes or u in start_nodes)
-            and (not final_nodes or v in final_nodes)}
+    result_pairs = {
+        (u, v)
+        for u, var, v in cfpq_results
+        if var == weak_normal_form.start_symbol
+        and (not start_nodes or u in start_nodes)
+        and (not final_nodes or v in final_nodes)
+    }
 
     return result_pairs
