@@ -2,7 +2,6 @@ from pyformlang.cfg import CFG, Terminal
 import networkx as nx
 from project.task6 import cfg_to_weak_normal_form
 from scipy.sparse import csr_matrix
-import numpy as np
 
 
 def matrix_based_cfpq(
