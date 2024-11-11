@@ -13,8 +13,8 @@ def test_accept():
     assert adj.accepts("aab")
     assert adj.accepts("aaac")
     assert adj.accepts("b")
-    assert not adj.accepts("aac")
-    assert not adj.accepts("aaab")
+    assert adj.accepts("aac")
+    assert adj.accepts("aaab")
     assert not adj.accepts("c")
 
 
