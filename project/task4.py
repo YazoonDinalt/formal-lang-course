@@ -1,7 +1,5 @@
-from functools import reduce
-
+import networkx as nx
 import numpy as np
-from networkx import MultiDiGraph
 from pyformlang.finite_automaton import Symbol
 from scipy.sparse import csr_matrix
 
@@ -9,73 +7,80 @@ from project.automata import graph_to_nfa, regex_to_dfa
 from project.task3 import AdjacencyMatrixFA
 
 
-def start_front(dfa: AdjacencyMatrixFA, nfa: AdjacencyMatrixFA):
-    dfa_start_state = list(dfa.start_states)[0]
-    data = np.ones(len(nfa.start_states), dtype=bool)
-    rows = [
-        dfa_start_state + dfa.states_count * i for i in range(len(nfa.start_states))
-    ]
-    cols = list(nfa.start_states)
-
-    return csr_matrix(
-        (data, (rows, cols)),
-        shape=(dfa.states_count * len(nfa.start_states), nfa.states_count),
-        dtype=bool,
+def front(regex_fa: AdjacencyMatrixFA, graph_fa: AdjacencyMatrixFA) -> csr_matrix:
+    current_front = csr_matrix(
+        (
+            regex_fa.states_count * len(graph_fa.start_states),
+            graph_fa.states_count,
+        )
     )
+
+    graph_start_states = {
+        state
+        for state, _ in sorted(
+            graph_fa.start_states_id.items(), key=lambda item: item[1]
+        )
+    }
+    for i, graph_state in enumerate(graph_start_states):
+        for regex_state in regex_fa.start_states:
+            regex_fa_state = regex_fa.state_id[regex_state] + i * regex_fa.states_count
+            graph_fa_state = graph_fa.state_id[graph_state]
+            current_front[regex_fa_state, graph_fa_state] = True
+
+    return current_front
+
+
+def create_next_front(
+    current_front: csr_matrix,
+    regex_fa: AdjacencyMatrixFA,
+    graph_fa: AdjacencyMatrixFA,
+    symbols: set[Symbol],
+) -> csr_matrix:
+    number_of_states = regex_fa.states_count
+    for s in symbols:
+        next_front = current_front @ graph_fa.decomposition[s]
+        for i in range(len(graph_fa.start_states)):
+            indices = np.arange(i * number_of_states, (i + 1) * number_of_states)
+            next_front[indices] = regex_fa.decomposition[s].T @ next_front[indices]
+        current_front += next_front
+    return current_front
 
 
 def ms_bfs_based_rpq(
-    regex: str, graph: MultiDiGraph, start_nodes: set[int], final_nodes: set[int]
+    regex: str,
+    graph: nx.MultiDiGraph,
+    start_nodes: set[int] = None,
+    final_nodes: set[int] = None,
 ) -> set[tuple[int, int]]:
-    regex_dfa = regex_to_dfa(regex)
-    graph_nfa = graph_to_nfa(
-        graph=graph, start_states=start_nodes, final_states=final_nodes
+    regex_dfa = AdjacencyMatrixFA(regex_to_dfa(regex))
+    graph_nfa = AdjacencyMatrixFA(graph_to_nfa(graph, start_nodes, final_nodes))
+    symbols = set(regex_dfa.decomposition.keys()).intersection(
+        graph_nfa.decomposition.keys()
     )
+    current_front = front(regex_dfa, graph_nfa)
+    visited = current_front
+    while current_front.size > 0:
+        next_front = create_next_front(current_front, regex_dfa, graph_nfa, symbols)
+        current_front = next_front > visited
+        visited += current_front
 
-    regex_amfa = AdjacencyMatrixFA(regex_dfa)
-    graph_amfa = AdjacencyMatrixFA(graph_nfa)
-
-    init_front = start_front(regex_amfa, graph_amfa)
-    result = set()
-    reg_amfa_transpose_matrices = {
-        symbol: matrix.transpose() for symbol, matrix in regex_amfa.matrix.items()
+    pairs = set()
+    graph_start_states = {
+        state
+        for state, _ in sorted(
+            graph_nfa.start_states_id.items(), key=lambda item: item[1]
+        )
     }
-    visited = init_front
-    symbols = [
-        sym for sym in regex_amfa.matrix.keys() if sym in graph_amfa.matrix.keys()
-    ]
+    graph_dict = {v: k for k, v in graph_nfa.state_id.items()}
 
-    while init_front.toarray().any():
-        next_fronts: dict[Symbol, csr_matrix] = {}
+    for i, graph_start in enumerate(graph_start_states):
+        start = i * regex_dfa.states_count
+        end = (i + 1) * regex_dfa.states_count
+        for regex_final in regex_dfa.final_states:
+            for visit_i in (
+                visited[start:end].getrow(regex_dfa.state_id[regex_final]).indices
+            ):
+                if graph_dict[visit_i] in graph_nfa.final_states:
+                    pairs.add((graph_start, graph_dict[visit_i]))
 
-        for symbol in symbols:
-            next_fronts[symbol] = init_front @ graph_amfa.matrix[symbol]
-
-            for i in range(len(graph_amfa.start_states)):
-                dfa_states_cnt = regex_amfa.states_count
-                start_ind, end_ind = i * dfa_states_cnt, (i + 1) * dfa_states_cnt
-                next_fronts[symbol][start_ind:end_ind] = (
-                    reg_amfa_transpose_matrices[symbol]
-                    @ next_fronts[symbol][start_ind:end_ind]
-                )
-
-        init_front = reduce(lambda x, y: x + y, next_fronts.values(), init_front)
-        init_front = init_front > visited
-        visited += init_front
-
-    reversed_nfa_states = {value: key for key, value in graph_amfa.states.items()}
-
-    for dfa_fn_state in regex_amfa.final_states:
-        for i, nfa_start_state in enumerate(graph_amfa.start_states):
-            for nfa_reached in visited.getrow(
-                regex_amfa.states_count * i + dfa_fn_state
-            ).indices:
-                if nfa_reached in graph_amfa.final_states:
-                    result.add(
-                        (
-                            reversed_nfa_states[nfa_start_state],
-                            reversed_nfa_states[nfa_reached],
-                        )
-                    )
-
-    return result
+    return pairs
