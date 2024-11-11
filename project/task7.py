@@ -13,10 +13,8 @@ def matrix_based_cfpq(
     graph_nodes = set(graph.nodes)
     start_nodes = start_nodes or graph_nodes
     final_nodes = final_nodes or graph_nodes
-
     node_to_idx_mapping = {node: i for i, node in enumerate(graph_nodes)}
     idx_to_node_mapping = {i: node for i, node in enumerate(graph_nodes)}
-
     n = len(graph_nodes)
     cfg = cfg_to_weak_normal_form(cfg)
     decomposition = {var: csr_matrix((n, n), dtype=bool) for var in cfg.variables}
